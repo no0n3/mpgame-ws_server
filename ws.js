@@ -13,13 +13,9 @@ function getUserIdByToken(token, callack) {
     var connection = getMySQLConnection();
     connection.connect();
     console.log('TOOOKEN => ', token)
-    connection.query("SELECT id FROM users WHERE token = '" + token + "'", function (error, results, fields) {
+    connection.query("SELECT id FROM users WHERE token = ?", [token], function (error, results, fields) {
         if (error) {
-            console.log('--------------------------1X')
-            console.log(error)
             throw error;
-        } else {
-            console.log('--------------------------2X')
         }
 
         var id = null;
