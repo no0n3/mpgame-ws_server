@@ -1,15 +1,26 @@
 var ch = require('./src/client-handle');
 var config = require('./config/config');
+var requestCommons = require('./src/common/request');
 var mysql = require('mysql');
 
-var connection = mysql.createConnection(config.db);
+function getMySQLConnection() {
+    var connection = mysql.createConnection(config.db);
+
+    return connection;
+}
 
 function getUserIdByToken(token, callack) {
+    var connection = getMySQLConnection();
     connection.connect();
     console.log('TOOOKEN => ', token)
-    connection.query('SELECT id FROM users WHERE token = \'AzOIx4Ju8jUqlWpCirRbGAT77PG4wNKe7zsH7QupywSfak03vc\'', function (error, results, fields) {
-        if (error)
+    connection.query("SELECT id FROM users WHERE token = '" + token + "'", function (error, results, fields) {
+        if (error) {
+            console.log('--------------------------1X')
+            console.log(error)
             throw error;
+        } else {
+            console.log('--------------------------2X')
+        }
 
         var id = null;
 
@@ -70,9 +81,12 @@ wsServer.on('request', function (request) {
         return;
     }
 
-    console.log('URL -> ', request.resource)
+    var token = requestCommons.getParameterByName('token', request.resource);
 
-    getUserIdByToken('AzOIx4Ju8jUqlWpCirRbGAT77PG4wNKe7zsH7QupywSfak03vc', function(playerId) {
+    console.log('URL -> ', request.resource)
+    console.log('TOKEN -->', '|' + requestCommons.getParameterByName('token', request.resource) + '|')
+
+    getUserIdByToken(token, function(playerId) {
         if (null === playerId) {
             request.reject();
         } else {
@@ -122,8 +136,8 @@ wsServer.on('request', function (request) {
         console.log('m type', d.type)
         console.log('xxx', false === init, playerId/*d.player*/);
         console.log(connections[playerId/*d.player*/])
-        return;
-        if (connections[playerId/*d.player*/] && false === connections[d.player].isStarted()) {
+
+        if (connections[playerId/*d.player*/] && false === connections[playerId].isStarted()) {
             if (playerId/*d.player*/) {
 //                playerId = d.player;
                 // connections[d.player] = new ch.ClientHandle({
@@ -146,18 +160,20 @@ wsServer.on('request', function (request) {
                     if (c1 && c2) {
                         c1.start();
                         c1.setOponentId(oponentId);
+                        c1.setPlayerN(1);
                         c2.start();
                         c2.setOponentId(playerId/*d.player*/);
+                        c2.setPlayerN(2);
 
                         c1.send(JSON.stringify({
                             type: 'start',
                             oponentId: oponentId,
-                            player: 1
+                            playerN: 1
                         }));
                         c2.send(JSON.stringify({
                             type: 'start',
                             oponentId: playerId/*d.player*/,
-                            player: 2
+                            playerN: 2
                         }));
 
                         init = true;
@@ -181,28 +197,27 @@ wsServer.on('request', function (request) {
 
             if ('move' === d.type) {
                 if (c1 && c2) {
-                    console.log('SEEEEEEND')
                     c1.send(JSON.stringify({
                         type: 'move',
                         pos: d.moveTo,
-                        player: playerId//d.player
+                        playerN: c1.getPlayerN()
                     }));
                     c2.send(JSON.stringify({
                         type: 'move',
                         pos: d.moveTo,
-                        player: playerId//d.player
+                        playerN: c1.getPlayerN()
                     }));
                 }
             } else if ('set_trap' === d.type) {
                 c1.send(JSON.stringify({
                     type: 'set_trap',
                     pos: d.pos,
-                    player: playerId//d.player
+                    playerN: c1.getPlayerN()
                 }));
                 c2.send(JSON.stringify({
                     type: 'set_trap',
                     pos: d.pos,
-                    player: playerId//d.player
+                    playerN: c1.getPlayerN()
                 }));
             } else if ('set_enemy_turn' === d.type) {
                 c2.send(JSON.stringify({

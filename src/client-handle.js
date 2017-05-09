@@ -2,6 +2,7 @@ function ClientHandle(data) {
     data = data || {};
 
     var oponentId = [];
+    var playerN = null;
 
     var connections = [];
 
@@ -40,6 +41,14 @@ function ClientHandle(data) {
 
     this.getOponentId = function () {
         return oponentId;
+    };
+
+    this.setPlayerN = function(n) {
+        playerN = n;
+    };
+
+    this.getPlayerN = function(n) {
+        return playerN;
     };
 
     this.addConnection(data.connection);
