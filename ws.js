@@ -1,4 +1,29 @@
 var ch = require('./src/client-handle');
+var config = require('./config/config');
+var mysql = require('mysql');
+
+var connection = mysql.createConnection(config.db);
+
+function getUserIdByToken(token, callack) {
+    connection.connect();
+    console.log('TOOOKEN => ', token)
+    connection.query('SELECT id FROM users WHERE token = \'AzOIx4Ju8jUqlWpCirRbGAT77PG4wNKe7zsH7QupywSfak03vc\'', function (error, results, fields) {
+        if (error)
+            throw error;
+
+        var id = null;
+
+        if (results && 0 < results.length) {
+            id = results[0].id;
+        }
+
+        if ('function' === typeof callack) {
+            callack(id);
+        }
+    });
+
+    connection.end();
+}
 
 var WebSocketServer = require('websocket').server;
 var http = require('http');
@@ -6,12 +31,12 @@ var url = require('url');
 
 var gamesData = {};
 
-var connectionPool = (function() {
+var connectionPool = (function () {
     var connections = {};
 
     return {
-        add : function(key, connection) {
-            
+        add: function (key, connection) {
+
         }
     };
 })();
@@ -45,8 +70,19 @@ wsServer.on('request', function (request) {
         return;
     }
 
+    console.log('URL -> ', request.resource)
+
+    getUserIdByToken('AzOIx4Ju8jUqlWpCirRbGAT77PG4wNKe7zsH7QupywSfak03vc', function(playerId) {
+        if (null === playerId) {
+            request.reject();
+        } else {
+            wsLogic(playerId);
+        }
+    });
+
+    function wsLogic(playerId) {
+        console.log('IN WS LOGIC', playerId)
     var init = false;
-    var playerId = null;
 
     function send(msg) {
         connection.sendUTF(msg);
@@ -72,9 +108,9 @@ wsServer.on('request', function (request) {
 
         var oponentId = null;
 
-        if (false === init && d.player) {
-            if (!connections[d.player]) {
-                connections[d.player] = new ch.ClientHandle({
+        if (false === init && playerId/*d.player*/) {
+            if (!connections[playerId/*d.player*/]) {
+                connections[playerId/*d.player*/] = new ch.ClientHandle({
                     connection: connection,
                     started: false
                 });
@@ -84,32 +120,34 @@ wsServer.on('request', function (request) {
         }
 
         console.log('m type', d.type)
-
-        if (connections[d.player] && false === connections[d.player].isStarted()) {
-            if (d.player) {
-                playerId = d.player;
+        console.log('xxx', false === init, playerId/*d.player*/);
+        console.log(connections[playerId/*d.player*/])
+        return;
+        if (connections[playerId/*d.player*/] && false === connections[d.player].isStarted()) {
+            if (playerId/*d.player*/) {
+//                playerId = d.player;
                 // connections[d.player] = new ch.ClientHandle({
                 //     connection: connection
                 // });
 
                 for (var i in waitingPlayers) {
-                    if (d.player != waitingPlayers[i]) {
+                    if (playerId/*d.player*/ != waitingPlayers[i]) {
                         oponentId = waitingPlayers[i];
                         break;
                     }
                 }
                 console.log('Opp id', oponentId)
                 if (!oponentId) {
-                    waitingPlayers.push(d.player);
+                    waitingPlayers.push(playerId/*d.player*/);
                 } else {
-                    var c1 = connections[d.player];
+                    var c1 = connections[playerId/*d.player*/];
                     var c2 = connections[oponentId];
 
                     if (c1 && c2) {
                         c1.start();
                         c1.setOponentId(oponentId);
                         c2.start();
-                        c2.setOponentId(d.player);
+                        c2.setOponentId(playerId/*d.player*/);
 
                         c1.send(JSON.stringify({
                             type: 'start',
@@ -118,7 +156,7 @@ wsServer.on('request', function (request) {
                         }));
                         c2.send(JSON.stringify({
                             type: 'start',
-                            oponentId: d.player,
+                            oponentId: playerId/*d.player*/,
                             player: 2
                         }));
 
@@ -147,24 +185,24 @@ wsServer.on('request', function (request) {
                     c1.send(JSON.stringify({
                         type: 'move',
                         pos: d.moveTo,
-                        player: d.player
+                        player: playerId//d.player
                     }));
                     c2.send(JSON.stringify({
                         type: 'move',
                         pos: d.moveTo,
-                        player: d.player
+                        player: playerId//d.player
                     }));
                 }
             } else if ('set_trap' === d.type) {
                 c1.send(JSON.stringify({
                     type: 'set_trap',
                     pos: d.pos,
-                    player: d.player
+                    player: playerId//d.player
                 }));
                 c2.send(JSON.stringify({
                     type: 'set_trap',
                     pos: d.pos,
-                    player: d.player
+                    player: playerId//d.player
                 }));
             } else if ('set_enemy_turn' === d.type) {
                 c2.send(JSON.stringify({
@@ -195,4 +233,5 @@ wsServer.on('request', function (request) {
     connection.on('close', function (reasonCode, description) {
         console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
     });
+    }
 });
